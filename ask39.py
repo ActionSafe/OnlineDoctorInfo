@@ -6,30 +6,33 @@ import re
 from queue import Queue
 import threading
 import time
+
+# 定义一些全局变量
 domain = 'http://ask.39.net'
 base_url = "http://ask.39.net/news/"
 regex_space = re.compile("[\n\s\t]")
 regex_docNum = re.compile("http[s]*://my.39.net/(.+)")
 regex_age = re.compile("(\d+)岁")
-headers = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:64.0) Gecko/20100101 Firefox/64.0'}
-lock = threading.Lock()
-sql_obj = mysqlPipe(name='abc')
-max_timeout = 3 #最大超时设置
-max_attempts = 3 #最大重连次数
-# 待爬取的问答页链接
-inqueryUrl = Queue()
-# 下载好的问答页
-inqueryHtml = Queue()
-# 待爬取的医生信息链接
-doctorUrl = Queue()
-# 查重
-doctorUrlSeen = set()
-# 下载好的医生信息页面:
-doctorHtml = Queue()
-# 待写入的问诊信息:
-inqueryParsed = Queue()
-# 待写入的医生信息:
-doctorParsed = Queue()
+headers = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:64.0) Gecko/20100101 Firefox/64.0'}  # 设置UA
+
+# 上锁,创建sqlPipe对象
+lock = threading.Lock() # 全局线程锁
+sql_obj = mysqlPipe(name='abc')  # 设置要创建的数据表名,默认数据库是test
+
+# 一些设置
+max_timeout = 3   # 最大超时设置
+max_attempts = 3   # 最大重连次数
+max_concurrent = 4  # 最大并发连接数
+max_parser = 2  # 网页解析线程数
+
+# 创建任务队列
+inqueryUrl = Queue()  # 待爬取的问答页链接
+inqueryHtml = Queue()  # 下载好的问答页
+doctorUrl = Queue()  # 待爬取的医生信息链接
+doctorUrlSeen = set()  # 查重
+doctorHtml = Queue()  # 下载好的医生信息页面:
+inqueryParsed = Queue()  # 待写入的问诊信息:
+doctorParsed = Queue()  # 待写入的医生信息:
 
 
 def downloader(source, target):
@@ -206,24 +209,20 @@ if __name__ == '__main__':
     threads.append(threading.Thread(target=taskManager, args=()))
     # 下载器
     # detail_url_old.put("https://www.haodf.com/wenda/fwliuhaibo_g_6798775932.htm")
-    threads.append(threading.Thread(target=downloader, args=(inqueryUrl, inqueryHtml)))
-    threads.append(threading.Thread(target=downloader, args=(inqueryUrl, inqueryHtml)))
-    threads.append(threading.Thread(target=downloader, args=(inqueryUrl, inqueryHtml)))
-    threads.append(threading.Thread(target=downloader, args=(inqueryUrl, inqueryHtml)))
-    threads.append(threading.Thread(target=downloader, args=(inqueryUrl, inqueryHtml)))
-    threads.append(threading.Thread(target=downloader, args=(doctorUrl, doctorHtml)))
-    threads.append(threading.Thread(target=downloader, args=(doctorUrl, doctorHtml)))
+    for i in range(max_concurrent):
+        threads.append(threading.Thread(target=downloader, args=(inqueryUrl, inqueryHtml)))
+        threads.append(threading.Thread(target=downloader, args=(doctorUrl, doctorHtml)))
     # 解析器
-    threads.append(threading.Thread(target=get_docinfo, args=()))
-    threads.append(threading.Thread(target=get_docinfo, args=()))
-    threads.append(threading.Thread(target=get_inquery, args=()))
-    threads.append(threading.Thread(target=get_inquery, args=()))
-    # 数据库模型
+    for i in range(max_parser):
+        threads.append(threading.Thread(target=get_docinfo, args=()))
+        threads.append(threading.Thread(target=get_inquery, args=()))
+    # 数据库操作线程
     threads.append(threading.Thread(target=write_docInfo, args=()))
     threads.append(threading.Thread(target=write_inquery, args=()))
     # 启动各线程
     for thread in threads:
         thread.start()
+    # join主线程，同步
     for thread in threads:
         thread.join()
 
