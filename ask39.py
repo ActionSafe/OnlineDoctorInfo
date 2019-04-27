@@ -13,7 +13,7 @@ regex_docNum = re.compile("http[s]*://my.39.net/(.+)")
 regex_age = re.compile("(\d+)岁")
 headers = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:64.0) Gecko/20100101 Firefox/64.0'}
 lock = threading.Lock()
-sql_obj = mysqlPipe(name='39asknew')
+sql_obj = mysqlPipe(name='abc')
 max_timeout = 3 #最大超时设置
 max_attempts = 3 #最大重连次数
 # 待爬取的问答页链接
